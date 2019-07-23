@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -90,6 +91,30 @@ func (a *auther) setAccessTokenAuthHeader(req *http.Request, requestToken, reque
 	}
 	signatureBase := signatureBase(req, params)
 	signature, err := a.signer().Sign(requestSecret, signatureBase)
+	if err != nil {
+		return err
+	}
+	oauthParams[oauthSignatureParam] = signature
+	req.Header.Set(authorizationHeaderParam, authHeaderValue(oauthParams))
+	return nil
+}
+
+// Sets request parameters to be able to refresh a token
+func (a *auther) setRefreshAccessTokenAuthHeader(req *http.Request, token Token) error {
+	if token.AdditionalData.SessionHandle == "" {
+		return errors.New("not able to refresh oauth1.0a token, since the token is missing the session handle")
+	}
+
+	oauthParams := a.commonOAuthParams()
+	oauthParams[oauthTokenParam] = token.Token
+	oauthParams[SessionHandleParam] = token.AdditionalData.SessionHandle
+
+	params, err := collectParameters(req, oauthParams)
+	if err != nil {
+		return err
+	}
+	signatureBase := signatureBase(req, params)
+	signature, err := a.signer().Sign(token.TokenSecret, signatureBase)
 	if err != nil {
 		return err
 	}

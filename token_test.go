@@ -15,14 +15,14 @@ func TestNewToken(t *testing.T) {
 }
 
 func TestStaticTokenSource(t *testing.T) {
-	ts := StaticTokenSource(NewToken("t", "s"))
+	ts := StaticTokenSource(NewToken("t", "s"), nil)
 	tk, err := ts.Token()
 	assert.Nil(t, err)
 	assert.Equal(t, "t", tk.Token)
 }
 
 func TestStaticTokenSourceEmpty(t *testing.T) {
-	ts := StaticTokenSource(nil)
+	ts := StaticTokenSource(nil, nil)
 	tk, err := ts.Token()
 	assert.Nil(t, tk)
 	if assert.Error(t, err) {

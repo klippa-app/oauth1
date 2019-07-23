@@ -152,7 +152,7 @@ func TestTwitterRequestAuthHeader(t *testing.T) {
 	values := url.Values{}
 	values.Add("status", "Hello Ladies + Gentlemen, a signed OAuth request!")
 
-	accessToken := &Token{expectedTwitterOAuthToken, oauthTokenSecret}
+	accessToken := &Token{expectedTwitterOAuthToken, oauthTokenSecret, nil}
 	req, err := http.NewRequest("POST", "https://api.twitter.com/1/statuses/update.json?include_entities=true", strings.NewReader(values.Encode()))
 	assert.Nil(t, err)
 	req.Header.Set(contentType, formContentType)

@@ -9,4 +9,6 @@ type Endpoint struct {
 	AuthorizeURL string
 	// Access Token URL (Token Request URI)
 	AccessTokenURL string
+	// Refresh Token URL (could be the same as AccessTokenURL)
+	RefreshTokenUrl string
 }
