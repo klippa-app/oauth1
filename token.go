@@ -54,8 +54,9 @@ func (s staticTokenSource) Token() (*Token, error) {
 
 	// If enough data is available and the token is expired, try to refresh the token
 	if s.token.AdditionalData != nil && s.token.AdditionalData.SessionHandle != "" && s.token.AdditionalData.ExpireTimestamp != nil {
-		// The token expires with a margin of 10 seconds, to prevent unexpected errors
-		if s.token.AdditionalData.ExpireTimestamp.Before(time.Now().Add(time.Second - 10)) {
+		// The token expires with a margin of 30 seconds, to prevent unexpected errors
+		expireAfter := time.Now().UTC().Add(time.Second * 30)
+		if expireAfter.After(*s.token.AdditionalData.ExpireTimestamp) {
 			refreshedToken, err := s.config.RefreshToken(*s.token)
 
 			if err != nil {
