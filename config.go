@@ -160,7 +160,12 @@ func (c *Config) AccessToken(requestToken, requestSecret, verifier string) (acce
 }
 
 func (c *Config) RefreshToken(expiredToken Token) (refreshedToken *Token, err error) {
-	req, err := http.NewRequest("POST", c.Endpoint.RefreshTokenUrl, nil)
+	refreshTokenUrl := c.Endpoint.AccessTokenURL
+	if c.Endpoint.RefreshTokenUrl != "" {
+		refreshTokenUrl = c.Endpoint.RefreshTokenUrl
+	}
+
+	req, err := http.NewRequest("POST", refreshTokenUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +229,7 @@ func parseAdditionalTokenDataFromAccessTokenResponse(responseValues url.Values) 
 	if expiresInValue != "" {
 		expiresInSeconds, err := strconv.ParseInt(expiresInValue, 10, 64)
 
-		if err != nil {
+		if err == nil {
 			expiresInTime := time.Now().UTC().Add(time.Second * time.Duration(expiresInSeconds))
 			additionData.ExpireTimestamp = &expiresInTime
 		}
@@ -234,9 +239,9 @@ func parseAdditionalTokenDataFromAccessTokenResponse(responseValues url.Values) 
 	if authorizationExpiresInValue != "" {
 		authorizationExpiresInSeconds, err := strconv.ParseInt(authorizationExpiresInValue, 10, 64)
 
-		if err != nil {
+		if err == nil {
 			authorizationExpiresInTime := time.Now().UTC().Add(time.Second * time.Duration(authorizationExpiresInSeconds))
-			additionData.ExpireTimestamp = &authorizationExpiresInTime
+			additionData.AuthorizationExpireTimestamp = &authorizationExpiresInTime
 		}
 	}
 
