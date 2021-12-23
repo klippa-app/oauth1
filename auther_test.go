@@ -17,9 +17,11 @@ func TestCommonOAuthParams(t *testing.T) {
 	}{
 		{
 			&auther{
-				&Config{ConsumerKey: "some_consumer_key"},
+				&Config{
+					ConsumerKey: "some_consumer_key",
+					Noncer:      &fixedNoncer{"some_nonce"},
+				},
 				&fixedClock{time.Unix(50037133, 0)},
-				&fixedNoncer{"some_nonce"},
 			},
 			map[string]string{
 				"oauth_consumer_key":     "some_consumer_key",
@@ -31,9 +33,12 @@ func TestCommonOAuthParams(t *testing.T) {
 		},
 		{
 			&auther{
-				&Config{ConsumerKey: "some_consumer_key", Realm: "photos"},
+				&Config{
+					ConsumerKey: "some_consumer_key",
+					Realm:       "photos",
+					Noncer:      &fixedNoncer{"some_nonce"},
+				},
 				&fixedClock{time.Unix(50037133, 0)},
-				&fixedNoncer{"some_nonce"},
 			},
 			map[string]string{
 				"oauth_consumer_key":     "some_consumer_key",
@@ -52,7 +57,7 @@ func TestCommonOAuthParams(t *testing.T) {
 }
 
 func TestNonce(t *testing.T) {
-	auther := &auther{}
+	auther := newAuther(nil)
 	nonce := auther.nonce()
 	// assert that 32 bytes (256 bites) become 44 bytes since a base64 byte
 	// zeros the 2 high bits. 3 bytes convert to 4 base64 bytes, 40 base64 bytes
@@ -62,7 +67,7 @@ func TestNonce(t *testing.T) {
 }
 
 func TestEpoch(t *testing.T) {
-	a := &auther{}
+	a := newAuther(nil)
 	// assert that a real time is used by default
 	assert.InEpsilon(t, time.Now().Unix(), a.epoch(), 1)
 	// assert that the fixed clock can be used for testing
@@ -80,6 +85,21 @@ func TestSigner_Default(t *testing.T) {
 	digest, err := a.signer().Sign("token_secret", "hello world")
 	assert.Nil(t, err)
 	assert.Equal(t, "HMAC-SHA1", method)
+	assert.Equal(t, expectedSignature, digest)
+}
+
+func TestSigner_SHA256(t *testing.T) {
+	config := &Config{
+		Signer: &HMAC256Signer{ConsumerSecret: "consumer_secret"},
+	}
+	a := newAuther(config)
+	// echo -n "hello world" | openssl dgst -sha256 -hmac "consumer_secret&token_secret" -binary | base64
+	expectedSignature := "pW9drXUyErU8DASWbsP2I3XZbju37AW+VzcGdYSeMo8="
+	// assert that the signer produces the expected HMAC-SHA256 digest
+	method := a.signer().Name()
+	digest, err := a.signer().Sign("token_secret", "hello world")
+	assert.Nil(t, err)
+	assert.Equal(t, "HMAC-SHA256", method)
 	assert.Equal(t, expectedSignature, digest)
 }
 

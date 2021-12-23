@@ -10,7 +10,7 @@ type TokenSource interface {
 	Token() (*Token, error)
 }
 
-type TokenAdditionalData struct {
+type TokenRefreshData struct {
 	ExpireTimestamp              *time.Time // When does the current access token expire?
 	AuthorizationExpireTimestamp *time.Time // When is no longer possible to refresh the token?
 	SessionHandle                string     // Needed for refreshing the token
@@ -19,9 +19,10 @@ type TokenAdditionalData struct {
 // Token is an AccessToken (token credential) which allows a consumer (client)
 // to access resources from an OAuth1 provider server.
 type Token struct {
-	Token          string
-	TokenSecret    string
-	AdditionalData *TokenAdditionalData
+	Token       string
+	TokenSecret string
+	Realm       string // Realm id that this token belongs to
+	refreshData *TokenRefreshData
 }
 
 // NewToken returns a new Token with the given token and token secret.
@@ -53,10 +54,10 @@ func (s staticTokenSource) Token() (*Token, error) {
 	}
 
 	// If enough data is available and the token is expired, try to refresh the token
-	if s.token.AdditionalData != nil && s.token.AdditionalData.SessionHandle != "" && s.token.AdditionalData.ExpireTimestamp != nil {
+	if s.token.refreshData != nil && s.token.refreshData.SessionHandle != "" && s.token.refreshData.ExpireTimestamp != nil {
 		// The token expires with a margin of 30 seconds, to prevent unexpected errors
 		expireAfter := time.Now().UTC().Add(time.Second * 30)
-		if expireAfter.After(*s.token.AdditionalData.ExpireTimestamp) {
+		if expireAfter.After(*s.token.refreshData.ExpireTimestamp) {
 			refreshedToken, err := s.config.RefreshToken(*s.token)
 
 			if err != nil {
