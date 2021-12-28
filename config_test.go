@@ -105,7 +105,7 @@ func TestConfigRequestToken(t *testing.T) {
 			RequestTokenURL: server.URL,
 		},
 	}
-	requestToken, requestSecret, err := config.RequestToken(nil)
+	requestToken, requestSecret, err := config.RequestToken()
 	assert.Nil(t, err)
 	assert.Equal(t, expectedToken, requestToken)
 	assert.Equal(t, expectedSecret, requestSecret)
@@ -117,7 +117,7 @@ func TestConfigRequestToken_InvalidRequestTokenURL(t *testing.T) {
 			RequestTokenURL: "http://wrong.com/oauth/request_token",
 		},
 	}
-	requestToken, requestSecret, err := config.RequestToken(nil)
+	requestToken, requestSecret, err := config.RequestToken()
 	assert.NotNil(t, err)
 	assert.Equal(t, "", requestToken)
 	assert.Equal(t, "", requestSecret)
@@ -138,7 +138,7 @@ func TestConfigRequestToken_CallbackNotConfirmed(t *testing.T) {
 			RequestTokenURL: server.URL,
 		},
 	}
-	requestToken, requestSecret, err := config.RequestToken(nil)
+	requestToken, requestSecret, err := config.RequestToken()
 	if assert.Error(t, err) {
 		assert.Equal(t, "oauth1: oauth_callback_confirmed was not true", err.Error())
 	}
@@ -155,7 +155,7 @@ func TestConfigRequestToken_CannotParseBody(t *testing.T) {
 			RequestTokenURL: server.URL,
 		},
 	}
-	requestToken, requestSecret, err := config.RequestToken(nil)
+	requestToken, requestSecret, err := config.RequestToken()
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid URL escape")
 	}
@@ -175,7 +175,7 @@ func TestConfigRequestToken_MissingTokenOrSecret(t *testing.T) {
 			RequestTokenURL: server.URL,
 		},
 	}
-	requestToken, requestSecret, err := config.RequestToken(nil)
+	requestToken, requestSecret, err := config.RequestToken()
 	if assert.Error(t, err) {
 		assert.Equal(t, "oauth1: Response missing oauth_token or oauth_token_secret", err.Error())
 	}
@@ -225,7 +225,7 @@ func TestConfigAccessToken(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier, nil)
+	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedToken, token.Token)
 	assert.Equal(t, expectedSecret, token.TokenSecret)
@@ -237,7 +237,7 @@ func TestConfigAccessToken_InvalidAccessTokenURL(t *testing.T) {
 			AccessTokenURL: "http://wrong.com/oauth/access_token",
 		},
 	}
-	token, err := config.AccessToken("any_token", "any_secret", "any_verifier", nil)
+	token, err := config.AccessToken("any_token", "any_secret", "any_verifier")
 	assert.NotNil(t, err)
 	assert.Nil(t, token)
 }
@@ -251,7 +251,7 @@ func TestConfigAccessToken_CannotParseBody(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	token, err := config.AccessToken("any_token", "any_secret", "any_verifier", nil)
+	token, err := config.AccessToken("any_token", "any_secret", "any_verifier")
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid URL escape")
 	}
@@ -269,7 +269,7 @@ func TestConfigAccessToken_MissingTokenOrSecret(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier, nil)
+	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
 	if assert.Error(t, err) {
 		assert.Equal(t, "oauth1: Response missing oauth_token or oauth_token_secret", err.Error())
 	}

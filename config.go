@@ -43,6 +43,8 @@ type Config struct {
 	HTTPClient *http.Client
 	// Call function with new token when the old token refreshes
 	OAuth10aTokenNotifyFunc *func(*Token)
+	// This can be set to add extra parameters to the Authorization header when retrieving request or access tokens
+	ExtraAuthHeaderParams map[string]string
 }
 
 // NewConfig returns a new Config with the given consumer key and secret.
@@ -75,12 +77,12 @@ func NewClient(ctx context.Context, config *Config, token *Token) *http.Client {
 // (temporary credentials). The extraParams parameter can be used to add extra
 // parameters (in addition to the standard OAuth parameters) to the Auth header.
 // See RFC 5849 2.1 Temporary Credentials.
-func (c *Config) RequestToken(extraParams map[string]string) (requestToken, requestSecret string, err error) {
+func (c *Config) RequestToken() (requestToken, requestSecret string, err error) {
 	req, err := http.NewRequest("POST", c.Endpoint.RequestTokenURL, nil)
 	if err != nil {
 		return "", "", err
 	}
-	err = newAuther(c).setRequestTokenAuthHeader(req, extraParams)
+	err = newAuther(c).setRequestTokenAuthHeader(req)
 	if err != nil {
 		return "", "", err
 	}
@@ -141,12 +143,12 @@ func ParseAuthorizationCallback(req *http.Request) (requestToken, verifier strin
 // credentials). The extraParams parameter can be used to add extra
 // parameters (in addition to the standard OAuth parameters) to the Auth header.
 // See RFC 5849 2.3 Token Credentials.
-func (c *Config) AccessToken(requestToken, requestSecret, verifier string, extraParams map[string]string) (token *Token, err error) {
+func (c *Config) AccessToken(requestToken, requestSecret, verifier string) (token *Token, err error) {
 	req, err := http.NewRequest("POST", c.Endpoint.AccessTokenURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	err = newAuther(c).setAccessTokenAuthHeader(req, requestToken, requestSecret, verifier, extraParams)
+	err = newAuther(c).setAccessTokenAuthHeader(req, requestToken, requestSecret, verifier)
 	if err != nil {
 		return nil, err
 	}

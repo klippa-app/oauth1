@@ -37,13 +37,14 @@ func TestTwitterRequestTokenAuthHeader(t *testing.T) {
 			AuthorizeURL:    "https://api.twitter.com/oauth/authorize",
 			AccessTokenURL:  "https://api.twitter.com/oauth/access_token",
 		},
-		Noncer: &fixedNoncer{expectedNonce},
+		Noncer:                &fixedNoncer{expectedNonce},
+		ExtraAuthHeaderParams: expectedExtraParams,
 	}
 
 	auther := &auther{config, &fixedClock{time.Unix(unixTimestamp, 0)}}
 	req, err := http.NewRequest("POST", config.Endpoint.RequestTokenURL, nil)
 	assert.Nil(t, err)
-	err = auther.setRequestTokenAuthHeader(req, expectedExtraParams)
+	err = auther.setRequestTokenAuthHeader(req)
 	// assert the request for a request token is signed and has an oauth_callback
 	assert.Nil(t, err)
 	params := parseOAuthParamsOrFail(t, req.Header.Get(authorizationHeaderParam))
@@ -81,13 +82,14 @@ func TestTwitterAccessTokenAuthHeader(t *testing.T) {
 			AuthorizeURL:    "https://api.twitter.com/oauth/authorize",
 			AccessTokenURL:  "https://api.twitter.com/oauth/access_token",
 		},
-		Noncer: &fixedNoncer{expectedNonce},
+		Noncer:                &fixedNoncer{expectedNonce},
+		ExtraAuthHeaderParams: expectedExtraParams,
 	}
 
 	auther := &auther{config, &fixedClock{time.Unix(unixTimestamp, 0)}}
 	req, err := http.NewRequest("POST", config.Endpoint.AccessTokenURL, nil)
 	assert.Nil(t, err)
-	err = auther.setAccessTokenAuthHeader(req, expectedRequestToken, requestTokenSecret, expectedVerifier, expectedExtraParams)
+	err = auther.setAccessTokenAuthHeader(req, expectedRequestToken, requestTokenSecret, expectedVerifier)
 	// assert the request for an access token is signed and has an oauth_token and verifier
 	assert.Nil(t, err)
 	params := parseOAuthParamsOrFail(t, req.Header.Get(authorizationHeaderParam))
