@@ -165,10 +165,10 @@ func (c *Config) AccessToken(requestToken, requestSecret, verifier string) (toke
 	}
 
 	return &Token{
-		Token:       accessToken,
-		TokenSecret: accessSecret,
-		refreshData: parseTokenRefreshDataFromAccessTokenResponse(values),
-		Realm:       c.Realm,
+		Token:          accessToken,
+		TokenSecret:    accessSecret,
+		AdditionalData: parseTokenRefreshDataFromAccessTokenResponse(values),
+		Realm:          c.Realm,
 	}, nil
 }
 
@@ -199,10 +199,10 @@ func (c *Config) RefreshToken(expiredToken Token) (refreshedToken *Token, err er
 	}
 
 	refreshedToken = &Token{
-		Token:       accessToken,
-		TokenSecret: accessSecret,
-		refreshData: parseTokenRefreshDataFromAccessTokenResponse(values),
-		Realm:       c.Realm,
+		Token:          accessToken,
+		TokenSecret:    accessSecret,
+		AdditionalData: parseTokenRefreshDataFromAccessTokenResponse(values),
+		Realm:          c.Realm,
 	}
 
 	// Execute the refresh function, to let external applications know a new token is used
@@ -235,8 +235,8 @@ func (c *Config) handleTokenRequest(req *http.Request) (values url.Values, err e
 }
 
 // This function is added for the accounting software 'Xero'
-func parseTokenRefreshDataFromAccessTokenResponse(responseValues url.Values) *TokenRefreshData {
-	additionData := TokenRefreshData{}
+func parseTokenRefreshDataFromAccessTokenResponse(responseValues url.Values) *TokenAdditionalData {
+	additionData := TokenAdditionalData{}
 
 	expiresInValue := responseValues.Get(ExpiresInParam)
 	if expiresInValue != "" {

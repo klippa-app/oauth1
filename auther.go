@@ -107,13 +107,13 @@ func (a *auther) setAccessTokenAuthHeader(req *http.Request, requestToken, reque
 
 // Sets request parameters to be able to refresh a token
 func (a *auther) setRefreshAccessTokenAuthHeader(req *http.Request, token Token) error {
-	if token.refreshData.SessionHandle == "" {
+	if token.AdditionalData.SessionHandle == "" {
 		return errors.New("not able to refresh oauth1.0a token, since the token is missing the session handle")
 	}
 
 	oauthParams := a.commonOAuthParams()
 	oauthParams[oauthTokenParam] = token.Token
-	oauthParams[SessionHandleParam] = token.refreshData.SessionHandle
+	oauthParams[SessionHandleParam] = token.AdditionalData.SessionHandle
 
 	params, err := collectParameters(req, oauthParams)
 	if err != nil {
