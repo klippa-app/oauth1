@@ -32,11 +32,11 @@ func TestTransport(t *testing.T) {
 	config := &Config{
 		ConsumerKey:    expectedConsumerKey,
 		ConsumerSecret: "consumer_secret",
+		Noncer:         &fixedNoncer{expectedNonce},
 	}
 	auther := &auther{
 		config: config,
 		clock:  &fixedClock{time.Unix(123456789, 0)},
-		noncer: &fixedNoncer{expectedNonce},
 	}
 	tr := &Transport{
 		source: StaticTokenSource(NewToken(expectedToken, "some_secret"), nil),
@@ -69,16 +69,15 @@ func TestTransport_nilSource(t *testing.T) {
 	tr := &Transport{
 		source: nil,
 		auther: &auther{
-			config: &Config{},
+			config: &Config{Noncer: &fixedNoncer{"any_nonce"}},
 			clock:  &fixedClock{time.Unix(123456789, 0)},
-			noncer: &fixedNoncer{"any_nonce"},
 		},
 	}
 	client := &http.Client{Transport: tr}
 	resp, err := client.Get("http://example.com")
 	assert.Nil(t, resp)
 	if assert.Error(t, err) {
-		assert.Equal(t, "Get http://example.com: oauth1: Transport's source is nil", err.Error())
+		assert.Contains(t, err.Error(), "oauth1: Transport's source is nil")
 	}
 }
 
@@ -86,16 +85,15 @@ func TestTransport_emptySource(t *testing.T) {
 	tr := &Transport{
 		source: StaticTokenSource(nil, nil),
 		auther: &auther{
-			config: &Config{},
+			config: &Config{Noncer: &fixedNoncer{"any_nonce"}},
 			clock:  &fixedClock{time.Unix(123456789, 0)},
-			noncer: &fixedNoncer{"any_nonce"},
 		},
 	}
 	client := &http.Client{Transport: tr}
 	resp, err := client.Get("http://example.com")
 	assert.Nil(t, resp)
 	if assert.Error(t, err) {
-		assert.Equal(t, "Get http://example.com: oauth1: Token is nil", err.Error())
+		assert.Contains(t, err.Error(), "oauth1: Token is nil")
 	}
 }
 
@@ -108,7 +106,7 @@ func TestTransport_nilAuther(t *testing.T) {
 	resp, err := client.Get("http://example.com")
 	assert.Nil(t, resp)
 	if assert.Error(t, err) {
-		assert.Equal(t, "Get http://example.com: oauth1: Transport's auther is nil", err.Error())
+		assert.Contains(t, err.Error(), "oauth1: Transport's auther is nil")
 	}
 }
 

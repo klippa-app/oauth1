@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -36,8 +37,14 @@ type Config struct {
 	Realm string
 	// OAuth1 Signer (defaults to HMAC-SHA1)
 	Signer Signer
+	// Noncer creates request nonces (defaults to DefaultNoncer)
+	Noncer Noncer
+	// HTTPClient overrides the choice of http.DefaultClient for RequestToken and AccessToken
+	HTTPClient *http.Client
 	// Call function with new token when the old token refreshes
 	OAuth10aTokenNotifyFunc *func(*Token)
+	// This can be set to add extra parameters to the Authorization header when retrieving request or access tokens
+	ExtraAuthHeaderParams map[string]string
 }
 
 // NewConfig returns a new Config with the given consumer key and secret.
@@ -67,7 +74,8 @@ func NewClient(ctx context.Context, config *Config, token *Token) *http.Client {
 // POSTing a request (with oauth_callback in the auth header) to the Endpoint
 // RequestTokenURL. The response body form is validated to ensure
 // oauth_callback_confirmed is true. Returns the request token and secret
-// (temporary credentials).
+// (temporary credentials). The extraParams parameter can be used to add extra
+// parameters (in addition to the standard OAuth parameters) to the Auth header.
 // See RFC 5849 2.1 Temporary Credentials.
 func (c *Config) RequestToken() (requestToken, requestSecret string, err error) {
 	req, err := http.NewRequest("POST", c.Endpoint.RequestTokenURL, nil)
@@ -78,24 +86,12 @@ func (c *Config) RequestToken() (requestToken, requestSecret string, err error) 
 	if err != nil {
 		return "", "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+
+	values, err := c.handleTokenRequest(req)
 	if err != nil {
 		return "", "", err
 	}
-	// when err is nil, resp contains a non-nil resp.Body which must be closed
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", "", fmt.Errorf("oauth1: Server returned status %d", resp.StatusCode)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", err
-	}
-	// ParseQuery to decode URL-encoded application/x-www-form-urlencoded body
-	values, err := url.ParseQuery(string(body))
-	if err != nil {
-		return "", "", err
-	}
+
 	requestToken = values.Get(oauthTokenParam)
 	requestSecret = values.Get(oauthTokenSecretParam)
 	if requestToken == "" || requestSecret == "" {
@@ -144,19 +140,36 @@ func ParseAuthorizationCallback(req *http.Request) (requestToken, verifier strin
 // AccessToken obtains an access token (token credential) by POSTing a
 // request (with oauth_token and oauth_verifier in the auth header) to the
 // Endpoint AccessTokenURL. Returns the access token and secret (token
-// credentials).
+// credentials). The extraParams parameter can be used to add extra
+// parameters (in addition to the standard OAuth parameters) to the Auth header.
 // See RFC 5849 2.3 Token Credentials.
-func (c *Config) AccessToken(requestToken, requestSecret, verifier string) (accessToken, accessSecret string, additionalData *TokenAdditionalData, err error) {
+func (c *Config) AccessToken(requestToken, requestSecret, verifier string) (token *Token, err error) {
 	req, err := http.NewRequest("POST", c.Endpoint.AccessTokenURL, nil)
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 	err = newAuther(c).setAccessTokenAuthHeader(req, requestToken, requestSecret, verifier)
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 
-	return handleTokenRequest(req, false)
+	values, err := c.handleTokenRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	accessToken := values.Get(oauthTokenParam)
+	accessSecret := values.Get(oauthTokenSecretParam)
+	if accessToken == "" || accessSecret == "" {
+		return nil, errors.New("oauth1: Response missing oauth_token or oauth_token_secret")
+	}
+
+	return &Token{
+		Token:          accessToken,
+		TokenSecret:    accessSecret,
+		AdditionalData: parseAdditionalTokenDataFromAccessTokenResponse(values),
+		Realm:          c.Realm,
+	}, nil
 }
 
 func (c *Config) RefreshToken(expiredToken Token) (refreshedToken *Token, err error) {
@@ -174,15 +187,22 @@ func (c *Config) RefreshToken(expiredToken Token) (refreshedToken *Token, err er
 		return nil, err
 	}
 
-	accessToken, accessSecret, additionalData, err := handleTokenRequest(req, true)
+	values, err := c.handleTokenRequest(req)
 	if err != nil {
 		return nil, err
+	}
+
+	accessToken := values.Get(oauthTokenParam)
+	accessSecret := values.Get(oauthTokenSecretParam)
+	if accessToken == "" || accessSecret == "" {
+		return nil, errors.New("oauth1: Response missing oauth_token or oauth_token_secret")
 	}
 
 	refreshedToken = &Token{
 		Token:          accessToken,
 		TokenSecret:    accessSecret,
-		AdditionalData: additionalData,
+		AdditionalData: parseAdditionalTokenDataFromAccessTokenResponse(values),
+		Realm:          c.Realm,
 	}
 
 	// Execute the refresh function, to let external applications know a new token is used
@@ -193,32 +213,25 @@ func (c *Config) RefreshToken(expiredToken Token) (refreshedToken *Token, err er
 	return refreshedToken, nil
 }
 
-func handleTokenRequest(req *http.Request, isRefresh bool) (accessToken, accessSecret string, additionalData *TokenAdditionalData, err error) {
-	resp, err := http.DefaultClient.Do(req)
+func (c *Config) handleTokenRequest(req *http.Request) (values url.Values, err error) {
+	resp, err := c.httpClient().Do(req)
 	if err != nil {
-		return "", "", nil, err
+		return nil, err
 	}
 	// when err is nil, resp contains a non-nil resp.Body which must be closed
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", "", nil, fmt.Errorf("oauth1: Server returned status %d", resp.StatusCode)
-	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", nil, err
+		return nil, fmt.Errorf("oauth1: error reading Body: %v", err)
 	}
-	// ParseQuery to decode URL-encoded application/x-www-form-urlencoded body
-	values, err := url.ParseQuery(string(body))
-	if err != nil {
-		return "", "", nil, err
-	}
-	accessToken = values.Get(oauthTokenParam)
-	accessSecret = values.Get(oauthTokenSecretParam)
-	if accessToken == "" || accessSecret == "" {
-		return "", "", nil, errors.New("oauth1: Response missing oauth_token or oauth_token_secret")
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("oauth1: invalid status %d: %s", resp.StatusCode, body)
 	}
 
-	return accessToken, accessSecret, parseAdditionalTokenDataFromAccessTokenResponse(values), nil
+	// ParseQuery to decode URL-encoded application/x-www-form-urlencoded body
+	// TrimSpace is needed because some integrations append a newline to the body
+	return url.ParseQuery(strings.TrimSpace(string(body)))
 }
 
 // This function is added for the accounting software 'Xero'
@@ -255,4 +268,11 @@ func parseAdditionalTokenDataFromAccessTokenResponse(responseValues url.Values) 
 	}
 
 	return &additionData
+}
+
+func (c *Config) httpClient() *http.Client {
+	if c.HTTPClient != nil {
+		return c.HTTPClient
+	}
+	return http.DefaultClient
 }

@@ -225,10 +225,10 @@ func TestConfigAccessToken(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	accessToken, accessSecret, _, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
+	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
 	assert.Nil(t, err)
-	assert.Equal(t, expectedToken, accessToken)
-	assert.Equal(t, expectedSecret, accessSecret)
+	assert.Equal(t, expectedToken, token.Token)
+	assert.Equal(t, expectedSecret, token.TokenSecret)
 }
 
 func TestConfigAccessToken_InvalidAccessTokenURL(t *testing.T) {
@@ -237,10 +237,9 @@ func TestConfigAccessToken_InvalidAccessTokenURL(t *testing.T) {
 			AccessTokenURL: "http://wrong.com/oauth/access_token",
 		},
 	}
-	accessToken, accessSecret, _, err := config.AccessToken("any_token", "any_secret", "any_verifier")
+	token, err := config.AccessToken("any_token", "any_secret", "any_verifier")
 	assert.NotNil(t, err)
-	assert.Equal(t, "", accessToken)
-	assert.Equal(t, "", accessSecret)
+	assert.Nil(t, token)
 }
 
 func TestConfigAccessToken_CannotParseBody(t *testing.T) {
@@ -252,12 +251,11 @@ func TestConfigAccessToken_CannotParseBody(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	accessToken, accessSecret, _, err := config.AccessToken("any_token", "any_secret", "any_verifier")
+	token, err := config.AccessToken("any_token", "any_secret", "any_verifier")
 	if assert.Error(t, err) {
 		assert.Contains(t, err.Error(), "invalid URL escape")
 	}
-	assert.Equal(t, "", accessToken)
-	assert.Equal(t, "", accessSecret)
+	assert.Nil(t, token)
 }
 
 func TestConfigAccessToken_MissingTokenOrSecret(t *testing.T) {
@@ -271,12 +269,11 @@ func TestConfigAccessToken_MissingTokenOrSecret(t *testing.T) {
 			AccessTokenURL: server.URL,
 		},
 	}
-	accessToken, accessSecret, _, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
+	token, err := config.AccessToken("request_token", "request_secret", expectedVerifier)
 	if assert.Error(t, err) {
 		assert.Equal(t, "oauth1: Response missing oauth_token or oauth_token_secret", err.Error())
 	}
-	assert.Equal(t, "", accessToken)
-	assert.Equal(t, "", accessSecret)
+	assert.Nil(t, token)
 }
 
 func TestParseAuthorizationCallback_GET(t *testing.T) {

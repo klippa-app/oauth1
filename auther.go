@@ -2,8 +2,6 @@ package oauth1
 
 import (
 	"bytes"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -39,19 +37,19 @@ type clock interface {
 	Now() time.Time
 }
 
-// A noncer provides random nonce strings.
-type noncer interface {
-	Nonce() string
-}
-
 // auther adds an "OAuth" Authorization header field to requests.
 type auther struct {
 	config *Config
 	clock  clock
-	noncer noncer
 }
 
 func newAuther(config *Config) *auther {
+	if config == nil {
+		config = &Config{}
+	}
+	if config.Noncer == nil {
+		config.Noncer = Base64Noncer{}
+	}
 	return &auther{
 		config: config,
 	}
@@ -59,9 +57,13 @@ func newAuther(config *Config) *auther {
 
 // setRequestTokenAuthHeader adds the OAuth1 header for the request token
 // request (temporary credential) according to RFC 5849 2.1.
+// The extra parameter can be used to set extra parameters in the Authorization header, needed by the client
 func (a *auther) setRequestTokenAuthHeader(req *http.Request) error {
 	oauthParams := a.commonOAuthParams()
 	oauthParams[oauthCallbackParam] = a.config.CallbackURL
+	for key, param := range a.config.ExtraAuthHeaderParams {
+		oauthParams[key] = param
+	}
 	params, err := collectParameters(req, oauthParams)
 	if err != nil {
 		return err
@@ -81,10 +83,14 @@ func (a *auther) setRequestTokenAuthHeader(req *http.Request) error {
 
 // setAccessTokenAuthHeader sets the OAuth1 header for the access token request
 // (token credential) according to RFC 5849 2.3.
+// The extra parameter can be used to set extra parameters in the Authorization header, needed by the client
 func (a *auther) setAccessTokenAuthHeader(req *http.Request, requestToken, requestSecret, verifier string) error {
 	oauthParams := a.commonOAuthParams()
 	oauthParams[oauthTokenParam] = requestToken
 	oauthParams[oauthVerifierParam] = verifier
+	for key, param := range a.config.ExtraAuthHeaderParams {
+		oauthParams[key] = param
+	}
 	params, err := collectParameters(req, oauthParams)
 	if err != nil {
 		return err
@@ -160,14 +166,9 @@ func (a *auther) commonOAuthParams() map[string]string {
 	return params
 }
 
-// Returns a base64 encoded random 32 byte string.
+// Returns a nonce using the configured Noncer.
 func (a *auther) nonce() string {
-	if a.noncer != nil {
-		return a.noncer.Nonce()
-	}
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.StdEncoding.EncodeToString(b)
+	return a.config.Noncer.Nonce()
 }
 
 // Returns the Unix epoch seconds.
